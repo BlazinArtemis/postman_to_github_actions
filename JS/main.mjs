@@ -43,10 +43,10 @@ async function main() {
             (await inquirer
               .prompt({
                 type: "input",
-                name: "githubToken",
+                name: "token",
                 message: "Enter your GitHub token:",
               })
-              .then(({ githubToken }) => githubToken));
+              .then(({ token }) => token));
 
           fs.appendFileSync(
             path.join(process.env.HOME, ".bashrc"),
