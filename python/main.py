@@ -2,10 +2,80 @@ import os
 import time
 import subprocess
 import argparse
+import platform
 import shutil
 from helper_functions import generate_github_actions_yaml, make_commit, export_postman_collection, create_github_repo, verify_github_actions_workflow, initialize_repo_with_readme, readme_exists, add_newman_step_to_yaml
 
 bashrc_path = os.path.expanduser('~/.bashrc')
+
+
+def set_or_update_env_var_unix(env_var_name, env_var_value, shell_file):
+    """
+    Sets or updates an environment variable in a Unix shell file persistently.
+    
+    Args:
+        env_var_name (str): The name of the environment variable.
+        env_var_value (str): The value of the environment variable.
+        shell_file (str): The path to the shell file where the variable will be set.
+    """
+    env_var_line = f'export {env_var_name}={env_var_value}'
+    updated_lines = []
+    var_found = False
+
+    # Read existing lines and update if the variable exists
+    with open(shell_file, 'r') as file:
+        for line in file:
+            if line.strip().startswith(f'export {env_var_name}='):
+                updated_lines.append(env_var_line + '\n')  # Update the existing variable
+                var_found = True
+            else:
+                updated_lines.append(line)
+    
+    # Append the new variable if it wasn't found
+    if not var_found:
+        updated_lines.append(env_var_line + '\n')
+
+    # Write back the modified lines to the file
+    with open(shell_file, 'w') as file:
+        file.writelines(updated_lines)
+    
+    print(f"Set or updated {env_var_name} in {shell_file}")
+
+def set_persistent_env_var(env_var_name, env_var_value):
+    """
+    Sets or updates a persistent environment variable across different operating systems.
+    
+    Args:
+        env_var_name (str): The name of the environment variable.
+        env_var_value (str): The value of the environment variable.
+    """
+    current_os = platform.system()
+
+    if current_os in ["Darwin", "Linux"]:
+        # macOS and Linux
+        home_dir = os.path.expanduser("~")
+        shell_files = [".bashrc", ".zshrc", ".profile"]
+
+        # Update the first shell configuration file that exists
+        for shell_file in shell_files:
+            full_path = os.path.join(home_dir, shell_file)
+            if os.path.exists(full_path):
+                set_or_update_env_var_unix(env_var_name, env_var_value, full_path)
+                break
+        else:
+            print("No suitable shell config file found. Please create a .bashrc or .zshrc file.")
+
+    elif current_os == "Windows":
+        # Windows - Use PowerShell to set a persistent user environment variable
+        set_env_cmd = f'[System.Environment]::SetEnvironmentVariable("{env_var_name}", "{env_var_value}", "User")'
+        subprocess.run(["powershell", "-Command", set_env_cmd], check=True)
+        print(f"Set or updated {env_var_name} in the Windows environment variables.")
+    
+    else:
+        print(f"Unsupported operating system: {current_os}")
+    
+    # For immediate access in the current session
+    os.environ[env_var_name] = env_var_value
 
 def clone_repository(repo_full_name, github_token):
     """
@@ -158,10 +228,7 @@ def main():
     if not github_token:
         github_token = input("Enter your GitHub token: ")
         os.environ['GITHUB_TOKEN'] = github_token
-        with open(bashrc_path, 'r') as bashrc:
-            if env_var not in bashrc.read():
-                with open(bashrc_path, 'a') as bashrc_append:
-                    bashrc_append.write(f'\nexport GITHUB_TOKEN={github_token}\n')
+        set_persistent_env_var('GITHUB_TOKEN', github_token)
 
 
     # Ask if the Postman collection is from UID or file
@@ -172,10 +239,7 @@ def main():
         if not postman_api_key:
             postman_api_key = input("Enter your Postman API key: ")
             os.environ['POSTMAN_API_KEY'] = postman_api_key
-            with open(bashrc_path, 'r') as bashrc:
-                if env_var not in bashrc.read():
-                    with open(bashrc_path, 'a') as bashrc_append:
-                        bashrc_append.write(f'\nexport POSTMAN_API_KEY={postman_api_key}\n')
+            set_persistent_env_var('POSTMAN_API_KEY', postman_api_key)
             
         collection_id = input("Enter the Postman collection ID: ")
         temp_collection_path = os.path.join(os.getcwd(), 'temp_collection.json')
