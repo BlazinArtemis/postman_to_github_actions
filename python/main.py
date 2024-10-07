@@ -5,6 +5,8 @@ import argparse
 import shutil
 from helper_functions import generate_github_actions_yaml, make_commit, export_postman_collection, create_github_repo, verify_github_actions_workflow, initialize_repo_with_readme, readme_exists, add_newman_step_to_yaml
 
+bashrc_path = os.path.expanduser('~/.bashrc')
+
 def clone_repository(repo_full_name, github_token):
     """
     Clone a GitHub repository using the provided token for authentication.
@@ -156,8 +158,11 @@ def main():
     if not github_token:
         github_token = input("Enter your GitHub token: ")
         os.environ['GITHUB_TOKEN'] = github_token
-        with open(os.path.expanduser('~/.bashrc'), 'a') as bashrc:
-            bashrc.write(f'\nexport GITHUB_TOKEN={github_token}\n')
+        with open(bashrc_path, 'r') as bashrc:
+            if env_var not in bashrc.read():
+                with open(bashrc_path, 'a') as bashrc_append:
+                    bashrc_append.write(f'\nexport GITHUB_TOKEN={github_token}\n')
+
 
     # Ask if the Postman collection is from UID or file
     collection_source = input("Is the Postman collection from UID (1) or file (2)? ")
@@ -167,8 +172,11 @@ def main():
         if not postman_api_key:
             postman_api_key = input("Enter your Postman API key: ")
             os.environ['POSTMAN_API_KEY'] = postman_api_key
-            with open(os.path.expanduser('~/.bashrc'), 'a') as bashrc:
-                bashrc.write(f'\nexport POSTMAN_API_KEY={postman_api_key}\n')
+            with open(bashrc_path, 'r') as bashrc:
+                if env_var not in bashrc.read():
+                    with open(bashrc_path, 'a') as bashrc_append:
+                        bashrc_append.write(f'\nexport POSTMAN_API_KEY={postman_api_key}\n')
+            
         collection_id = input("Enter the Postman collection ID: ")
         temp_collection_path = os.path.join(os.getcwd(), 'temp_collection.json')
         export_postman_collection(postman_api_key, collection_id, temp_collection_path)
